@@ -22,8 +22,11 @@ class BmsBluetoothManager(
     private val ANT_CHAR_UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
     private val CLIENT_CHARACTERISTIC_CONFIG = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-    // Python 示例中的查询指令: 5A 5A 00 00 01 01
-    private val QUERY_COMMAND = byteArrayOf(0x5A.toByte(), 0x5A.toByte(), 0x00.toByte(), 0x00.toByte(), 0x01.toByte(), 0x01.toByte())
+    // 查询指令: 7E A1 01 00 00 BE 18 55 AA 55
+    private val QUERY_COMMAND = byteArrayOf(
+        0x7E.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(),
+        0xBE.toByte(), 0x18.toByte(), 0x55.toByte(), 0xAA.toByte(), 0x55.toByte()
+    )
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -125,8 +128,11 @@ class BmsBluetoothManager(
 
         bmsDataBuffer.addAll(data.toList())
 
-        // 假设 0x55 是结束符（根据你原有逻辑）
-        if (bmsDataBuffer.isNotEmpty() && bmsDataBuffer.last() == 0x55.toByte()) {
+        // 根据用户反馈，完整报文以 AA 55 结束
+        if (bmsDataBuffer.size >= 2 && 
+            bmsDataBuffer[bmsDataBuffer.size - 2] == 0xAA.toByte() && 
+            bmsDataBuffer.last() == 0x55.toByte()) {
+            
             onDataReceived(bmsDataBuffer.toByteArray())
             // 某些 BMS 可能需要循环查询，如果数据不是自动推送的，可以在这里按需再次调用 sendBmsCommand
             bmsDataBuffer.clear()

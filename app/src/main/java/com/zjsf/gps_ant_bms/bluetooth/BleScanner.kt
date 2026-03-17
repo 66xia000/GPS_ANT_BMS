@@ -1,7 +1,6 @@
 package com.zjsf.gps_ant_bms.bluetooth
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
@@ -13,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
+import android.bluetooth.BluetoothAdapter
 
 class BleScanner(
     private val context: Context,
@@ -28,7 +28,16 @@ class BleScanner(
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             if (hasPermissions()) {
-                onDeviceFound(result)
+                val deviceName = try {
+                    result.device.name
+                } catch (e: SecurityException) {
+                    null
+                }
+                
+                // 只输出名称以 "ANT" 开头的设备
+                if (deviceName?.startsWith("ANT", ignoreCase = true) == true) {
+                    onDeviceFound(result)
+                }
             }
         }
 

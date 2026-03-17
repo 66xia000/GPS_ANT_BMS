@@ -10,5 +10,9 @@ data class BmsData(
     val remainingCharge: Double,
     val mosTemp: Int,
     val balancerTemp: Int,
-    val cellVoltages: List<Int>
+    val cellVoltages: List<Int>,
+    val temperatures: List<Int>,
+    val soh: Int = 0,
+    val power: Double = 0.0,
+    val runtime: Long = 0L
 )

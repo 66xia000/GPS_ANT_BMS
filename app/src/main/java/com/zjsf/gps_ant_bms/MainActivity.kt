@@ -3,6 +3,7 @@ package com.zjsf.gps_ant_bms
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
@@ -35,9 +36,8 @@ class MainActivity : AppCompatActivity() {
     private val discoveredDevices = mutableListOf<BleDevice>()
     private var scanDialog: androidx.appcompat.app.AlertDialog? = null
 
-    private val LOCATION_PERMISSION_REQUEST_CODE = 1
-    private val BLUETOOTH_PERMISSION_REQUEST_CODE = 2
-    private val SCAN_PERIOD: Long = 1000 // 1 second
+    private val PERMISSION_REQUEST_CODE = 100
+    private val SCAN_PERIOD: Long = 5000 // 5 seconds
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,7 +83,11 @@ class MainActivity : AppCompatActivity() {
         bleScanner = BleScanner(this, bluetoothAdapter,
             onDeviceFound = { result ->
                 val deviceName = try {
-                    result.device.name ?: "Unknown Device"
+                    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                        result.device.name ?: "Unknown Device"
+                    } else {
+                        "Unknown (No Permission)"
+                    }
                 } catch (e: SecurityException) {
                     "Unknown Device (No Permission)"
                 }
@@ -129,12 +133,24 @@ class MainActivity : AppCompatActivity() {
         sb.append("--- BMS Status ---\n")
         sb.append("Total Voltage: %.2f V\n".format(data.totalVoltage))
         sb.append("Current:       %.1f A\n".format(data.current))
+        sb.append("Power:         %.1f W\n".format(data.power))
         sb.append("SOC:           %d %%\n".format(data.soc))
+        sb.append("SOH:           %d %%\n".format(data.soh))
         sb.append("Capacity:      %.2f Ah\n".format(data.capacity))
         sb.append("Remaining:     %.2f Ah\n".format(data.remainingCharge))
         sb.append("MOS Temp:      %d °C\n".format(data.mosTemp))
         sb.append("Balancer Temp: %d °C\n".format(data.balancerTemp))
         
+        if (data.temperatures.isNotEmpty()) {
+            sb.append("Sensor Temps:  ${data.temperatures.joinToString(", ")} °C\n")
+        }
+        
+        val d = data.runtime / 86400
+        val h = (data.runtime % 86400) / 3600
+        val m = (data.runtime % 3600) / 60
+        val s = data.runtime % 60
+        sb.append("Runtime:       %d天 %02d:%02d:%02d\n".format(d, h, m, s))
+
         sb.append("\n--- Cell Voltages ---\n")
         data.cellVoltages.forEachIndexed { index, voltage ->
             sb.append("Cell %02d: %d mV\n".format(index + 1, voltage))
@@ -146,8 +162,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), LOCATION_PERMISSION_REQUEST_CODE)
+        val permissions = mutableListOf<String>()
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_SCAN)
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        
+        val missingPermissions = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        
+        if (missingPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
             locationHelper.startLocationUpdates()
         }
@@ -155,13 +182,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+        if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 locationHelper.startLocationUpdates()
-            }
-        } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST_CODE) {
-            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                bleScanner.startScan(SCAN_PERIOD)
             }
         }
     }
