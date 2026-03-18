@@ -27,17 +27,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gpsSpeedTextView: TextView
     private lateinit var bmsDataTextView: TextView
     private lateinit var scanButton: android.widget.Button
+    private lateinit var floatingWindowSwitch: android.widget.Switch
     
     private lateinit var locationHelper: LocationHelper
     private lateinit var bleScanner: BleScanner
     private lateinit var bmsBluetoothManager: BmsBluetoothManager
     
+    private var currentSpeed: Double = 0.0
+    private var currentVoltage: Double = 0.0
+    private var currentCurrent: Double = 0.0
+
     private lateinit var bleDeviceAdapter: BleDeviceAdapter
     private val discoveredDevices = mutableListOf<BleDevice>()
     private var scanDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val PERMISSION_REQUEST_CODE = 100
+    private val OVERLAY_PERMISSION_REQUEST_CODE = 101
     private val SCAN_PERIOD: Long = 5000 // 5 seconds
+    private val PREFS_NAME = "BmsPrefs"
+    private val PREF_FLOATING_WINDOW = "floating_window_enabled"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,12 +60,80 @@ class MainActivity : AppCompatActivity() {
         initViews()
         initModules()
         checkPermissions()
+        
+        if (isFloatingWindowEnabled()) {
+            checkOverlayPermission()
+        }
+    }
+
+    private fun isFloatingWindowEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        return prefs.getBoolean(PREF_FLOATING_WINDOW, false)
+    }
+
+    private fun setFloatingWindowEnabled(enabled: Boolean) {
+        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_FLOATING_WINDOW, enabled).apply()
+    }
+
+    private fun checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!android.provider.Settings.canDrawOverlays(this)) {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST_CODE)
+            } else {
+                startFloatingWindowService()
+            }
+        } else {
+            startFloatingWindowService()
+        }
+    }
+
+    private fun startFloatingWindowService() {
+        val intent = android.content.Intent(this, FloatingWindowService::class.java)
+        startService(intent)
+    }
+
+    private fun stopFloatingWindowService() {
+        val intent = android.content.Intent(this, FloatingWindowService::class.java)
+        stopService(intent)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == OVERLAY_PERMISSION_REQUEST_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (android.provider.Settings.canDrawOverlays(this)) {
+                    if (isFloatingWindowEnabled()) {
+                        startFloatingWindowService()
+                    }
+                } else {
+                    // Permission denied, uncheck the switch
+                    floatingWindowSwitch.isChecked = false
+                    setFloatingWindowEnabled(false)
+                }
+            }
+        }
     }
 
     private fun initViews() {
         gpsSpeedTextView = findViewById(R.id.textViewGpsSpeed)
         bmsDataTextView = findViewById(R.id.textViewBmsData)
         scanButton = findViewById(R.id.buttonScanBle)
+        floatingWindowSwitch = findViewById(R.id.switchFloatingWindow)
+        
+        floatingWindowSwitch.isChecked = isFloatingWindowEnabled()
+        floatingWindowSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setFloatingWindowEnabled(isChecked)
+            if (isChecked) {
+                checkOverlayPermission()
+            } else {
+                stopFloatingWindowService()
+            }
+        }
         
         bleDeviceAdapter = BleDeviceAdapter(this, discoveredDevices) { device ->
             val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -76,8 +152,9 @@ class MainActivity : AppCompatActivity() {
         val bluetoothAdapter = bluetoothManager.adapter
 
         locationHelper = LocationHelper(this) { location ->
-            val speed = location.speed * 3.6
-            gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(speed)
+            currentSpeed = location.speed * 3.6
+            gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(currentSpeed)
+            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent)
         }
 
         bleScanner = BleScanner(this, bluetoothAdapter,
@@ -129,6 +206,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateBmsUi(data: com.zjsf.gps_ant_bms.model.BmsData) {
+        currentVoltage = data.totalVoltage
+        currentCurrent = data.current
+        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent)
+
         val sb = StringBuilder()
         sb.append("--- BMS Status ---\n")
         sb.append("Total Voltage: %.2f V\n".format(data.totalVoltage))

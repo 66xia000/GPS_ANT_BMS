@@ -1,0 +1,67 @@
+NRF Connect, 2026-03-16
+ANT@BLE24CBUB-8FQR  (5A:D8:29:5F:DD:15)
+V	17:28:13.164	Connecting to 5A:D8:29:5F:DD:15...
+D	17:28:13.164	gatt = device.connectGatt(autoConnect = false, TRANSPORT_LE, preferred PHY = LE 1M)
+D	17:28:14.564	[Broadcast] Action received: android.bluetooth.device.action.ACL_CONNECTED
+D	17:28:14.571	[Callback] Connection state changed with status: 0 and new state: CONNECTED (2)
+I	17:28:14.571	Connected to 5A:D8:29:5F:DD:15
+V	17:28:14.582	Discovering services...
+D	17:28:14.582	gatt.discoverServices()
+I	17:28:14.819	Connection parameters updated (interval: 7.5ms, latency: 0, timeout: 5000ms)
+D	17:28:15.154	[Callback] Services discovered with status: 0
+I	17:28:15.154	Services discovered
+V	17:28:15.158	Generic Access (0x1800)
+- Device Name [R] (0x2A00)
+- Appearance [R] (0x2A01)
+- Peripheral Preferred Connection Parameters [R] (0x2A04)
+Generic Attribute (0x1801)
+- Service Changed [I] (0x2A05)
+Client Characteristic Configuration (0x2902)
+Unknown Service (0000ffe0-0000-1000-8000-00805f9b34fb)
+- Unknown Characteristic [N R W WNR] (0000ffe1-0000-1000-8000-00805f9b34fb)
+Client Characteristic Configuration (0x2902)
+Characteristic User Description (0x2901)
+- Unknown Characteristic [W WNR] (0000fff1-0000-1000-8000-00805f9b34fb)
+Characteristic User Description (0x2901)
+- Unknown Characteristic [N R W WNR] (0000fff2-0000-1000-8000-00805f9b34fb)
+Client Characteristic Configuration (0x2902)
+Characteristic User Description (0x2901)
+- Unknown Characteristic [W WNR] (0000fff3-0000-1000-8000-00805f9b34fb)
+Characteristic User Description (0x2901)
+- Unknown Characteristic [N R W WNR] (0000fff4-0000-1000-8000-00805f9b34fb)
+Client Characteristic Configuration (0x2902)
+Characteristic User Description (0x2901)
+D	17:28:15.158	gatt.setCharacteristicNotification(00002a05-0000-1000-8000-00805f9b34fb, true)
+D	17:28:15.159	gatt.setCharacteristicNotification(0000ffe1-0000-1000-8000-00805f9b34fb, true)
+D	17:28:15.160	gatt.setCharacteristicNotification(0000fff2-0000-1000-8000-00805f9b34fb, true)
+D	17:28:15.161	gatt.setCharacteristicNotification(0000fff4-0000-1000-8000-00805f9b34fb, true)
+I	17:28:15.214	Connection parameters updated (interval: 30.0ms, latency: 0, timeout: 5000ms)
+I	17:28:20.633	Connection parameters updated (interval: 25.0ms, latency: 2, timeout: 2000ms)
+V	17:28:22.856	Enabling notifications for 0000ffe1-0000-1000-8000-00805f9b34fb
+D	17:28:22.856	gatt.setCharacteristicNotification(0000ffe1-0000-1000-8000-00805f9b34fb, true)
+D	17:28:22.857	gatt.writeDescriptor(00002902-0000-1000-8000-00805f9b34fb, value=0x0100)
+I	17:28:22.953	Data written to descr. 00002902-0000-1000-8000-00805f9b34fb, value: (0x) 01-00
+A	17:28:22.953	"Notifications enabled" sent
+V	17:28:22.956	Notifications enabled for 0000ffe1-0000-1000-8000-00805f9b34fb
+V	17:28:38.644	Writing request to characteristic 0000ffe1-0000-1000-8000-00805f9b34fb
+D	17:28:38.644	gatt.writeCharacteristic(0000ffe1-0000-1000-8000-00805f9b34fb, value=0x7EA1010000BE1855AA55)
+I	17:28:38.703	Data written to 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) 7E-A1-01-00-00-BE-18-55-AA-55
+A	17:28:38.703	"(0x) 7E-A1-01-00-00-BE-18-55-AA-55" sent
+I	17:28:38.728	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) 7E-A1-11-00-00-A8-01-01-04-14-00-00-00-00-00-00-00-00-00-00
+A	17:28:38.728	"(0x) 7E-A1-11-00-00-A8-01-01-04-14-00-00-00-00-00-00-00-00-00-00" received
+I	17:28:38.728	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) 80-01-00-00-00-00-00-00-00-00-00-00-00-00-F0-0F-F0-0F-F0-0F
+A	17:28:38.728	"(0x) 80-01-00-00-00-00-00-00-00-00-00-00-00-00-F0-0F-F0-0F-F0-0F" received
+I	17:28:38.729	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) F1-0F-F0-0F-F0-0F-F0-0F-F0-0F-EF-0F-F0-0F-F0-0F-F0-0F-F0-0F
+A	17:28:38.729	"(0x) F1-0F-F0-0F-F0-0F-F0-0F-F0-0F-EF-0F-F0-0F-F0-0F-F0-0F-F0-0F" received
+I	17:28:38.754	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) F0-0F-F1-0F-F0-0F-F0-0F-F0-0F-F0-0F-F1-0F-0F-00-0E-00-D8-FF
+A	17:28:38.755	"(0x) F0-0F-F1-0F-F0-0F-F0-0F-F0-0F-F0-0F-F1-0F-0F-00-0E-00-D8-FF" received
+I	17:28:38.755	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) D8-FF-0F-00-10-00-E0-1F-00-00-5D-00-64-00-01-01-00-00-80-FE
+A	17:28:38.755	"(0x) D8-FF-0F-00-10-00-E0-1F-00-00-5D-00-64-00-01-01-00-00-80-FE" received
+I	17:28:38.755	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) 21-0A-7E-DF-4E-09-E7-B6-14-00-00-00-00-00-85-FE-B3-00-00-00
+A	17:28:38.755	"(0x) 21-0A-7E-DF-4E-09-E7-B6-14-00-00-00-00-00-85-FE-B3-00-00-00" received
+I	17:28:38.779	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) 00-00-F1-0F-04-00-EF-0F-09-00-02-00-F0-0F-00-00-7D-00-79-00
+A	17:28:38.779	"(0x) 00-00-F1-0F-04-00-EF-0F-09-00-02-00-F0-0F-00-00-7D-00-79-00" received
+I	17:28:38.780	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) AA-02-F1-FA-9E-2A-13-00-2F-43-16-00-2A-62-03-00-32-58-09-00
+A	17:28:38.780	"(0x) AA-02-F1-FA-9E-2A-13-00-2F-43-16-00-2A-62-03-00-32-58-09-00" received
+I	17:28:38.780	Notification received from 0000ffe1-0000-1000-8000-00805f9b34fb, value: (0x) 00-00-00-00-46-63-03-00-00-00-C4-07-00-00-A7-7F-AA-55
+A	17:28:38.780	"(0x) 00-00-00-00-46-63-03-00-00-00-C4-07-00-00-A7-7F-AA-55" received
