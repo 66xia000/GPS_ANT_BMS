@@ -89,9 +89,9 @@ class FloatingWindowService : Service() {
 
     fun updateDisplay(speed: Double, voltage: Double, current: Double) {
         floatingView?.let {
-            it.findViewById<TextView>(R.id.tv_speed).text = "%.2f km/h".format(speed)
-            it.findViewById<TextView>(R.id.tv_voltage).text = "%.2f V".format(voltage)
-            it.findViewById<TextView>(R.id.tv_current).text = "%.1f A".format(current)
+            it.findViewById<TextView>(R.id.tv_speed_value).text = "%.2f".format(speed)
+            it.findViewById<TextView>(R.id.tv_voltage_value).text = "%.2f".format(voltage)
+            it.findViewById<TextView>(R.id.tv_current_value).text = "%.2f".format(current)
         }
     }
 

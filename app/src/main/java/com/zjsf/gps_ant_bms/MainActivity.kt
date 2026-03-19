@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     private val SCAN_PERIOD: Long = 5000 // 5 seconds
     private val PREFS_NAME = "BmsPrefs"
     private val PREF_FLOATING_WINDOW = "floating_window_enabled"
+    private val PREF_LAST_DEVICE_ADDRESS = "last_device_address"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +75,16 @@ class MainActivity : AppCompatActivity() {
     private fun setFloatingWindowEnabled(enabled: Boolean) {
         val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
         prefs.edit().putBoolean(PREF_FLOATING_WINDOW, enabled).apply()
+    }
+
+    private fun saveLastDeviceAddress(address: String) {
+        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        prefs.edit().putString(PREF_LAST_DEVICE_ADDRESS, address).apply()
+    }
+
+    private fun getLastDeviceAddress(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        return prefs.getString(PREF_LAST_DEVICE_ADDRESS, null)
     }
 
     private fun checkOverlayPermission() {
@@ -136,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         bleDeviceAdapter = BleDeviceAdapter(this, discoveredDevices) { device ->
+            saveLastDeviceAddress(device.address)
             val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
             val deviceObj = bluetoothManager.adapter.getRemoteDevice(device.address)
             bmsBluetoothManager.connect(deviceObj)
@@ -205,6 +217,23 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun reconnectLastDevice() {
+        val lastAddress = getLastDeviceAddress()
+        if (lastAddress != null) {
+            val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val bluetoothAdapter = bluetoothManager.adapter
+            if (bluetoothAdapter != null && bluetoothAdapter.isEnabled) {
+                try {
+                    val device = bluetoothAdapter.getRemoteDevice(lastAddress)
+                    android.util.Log.i("MainActivity", "自动连接上次设备: $lastAddress")
+                    bmsBluetoothManager.connect(device)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "自动连接失败: ${e.message}")
+                }
+            }
+        }
+    }
+
     private fun updateBmsUi(data: com.zjsf.gps_ant_bms.model.BmsData) {
         currentVoltage = data.totalVoltage
         currentCurrent = data.current
@@ -258,6 +287,7 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
             locationHelper.startLocationUpdates()
+            reconnectLastDevice()
         }
     }
 
@@ -266,6 +296,7 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 locationHelper.startLocationUpdates()
+                reconnectLastDevice()
             }
         }
     }

@@ -22,6 +22,10 @@ class BmsBluetoothManager(
     private val handler = Handler(Looper.getMainLooper())
     private var pollingInterval: Long = 1000 // 默认 1 秒
     private var isPolling = false
+    
+    private var lastConnectedDevice: BluetoothDevice? = null
+    private var isAutoReconnectEnabled = false
+    private val RECONNECT_DELAY: Long = 2000 // 2 seconds
 
     // 常量定义
     private val ANT_SERVICE_UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb")
@@ -42,12 +46,24 @@ class BmsBluetoothManager(
             }
         }
     }
+    
+    private val reconnectRunnable = object : Runnable {
+        override fun run() {
+            if (isAutoReconnectEnabled && bluetoothGatt == null) {
+                lastConnectedDevice?.let {
+                    Log.i("BmsBtManager", "尝试自动重连至: ${it.address}")
+                    connect(it, true)
+                }
+            }
+        }
+    }
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             onConnectionStateChanged(newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.i("BmsBtManager", "已连接到 GATT 服务器，开始发现服务...")
+                handler.removeCallbacks(reconnectRunnable)
                 if (hasConnectPermission()) {
                     try {
                         gatt.discoverServices()
@@ -58,7 +74,13 @@ class BmsBluetoothManager(
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i("BmsBtManager", "断开连接")
                 stopPolling()
+                bluetoothGatt?.close()
                 bluetoothGatt = null
+                
+                if (isAutoReconnectEnabled) {
+                    Log.i("BmsBtManager", "2秒后将尝试重连...")
+                    handler.postDelayed(reconnectRunnable, RECONNECT_DELAY)
+                }
             }
         }
 
@@ -162,7 +184,9 @@ class BmsBluetoothManager(
         }
     }
 
-    fun connect(device: BluetoothDevice) {
+    fun connect(device: BluetoothDevice, autoReconnect: Boolean = true) {
+        isAutoReconnectEnabled = autoReconnect
+        lastConnectedDevice = device
         if (hasConnectPermission()) {
             try {
                 bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -173,6 +197,8 @@ class BmsBluetoothManager(
     }
 
     fun disconnect() {
+        isAutoReconnectEnabled = false
+        handler.removeCallbacks(reconnectRunnable)
         stopPolling()
         if (hasConnectPermission()) {
             try {
