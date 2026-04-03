@@ -1,7 +1,9 @@
 package com.zjsf.gps_ant_bms
 
 import android.Manifest
+import android.app.ActivityManager
 import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -28,14 +30,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bmsDataTextView: TextView
     private lateinit var scanButton: android.widget.Button
     private lateinit var floatingWindowSwitch: android.widget.Switch
+    private lateinit var hideFromRecentsSwitch: android.widget.Switch
     
     private lateinit var locationHelper: LocationHelper
     private lateinit var bleScanner: BleScanner
     private lateinit var bmsBluetoothManager: BmsBluetoothManager
     
     private var currentSpeed: Double = 0.0
-    private var currentVoltage: Double = 0.0
+    private var currentVoltage: Double = 0.000
     private var currentCurrent: Double = 0.0
+    private var currentVoltageDiff: Int = 0
 
     private lateinit var bleDeviceAdapter: BleDeviceAdapter
     private val discoveredDevices = mutableListOf<BleDevice>()
@@ -46,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private val SCAN_PERIOD: Long = 5000 // 5 seconds
     private val PREFS_NAME = "BmsPrefs"
     private val PREF_FLOATING_WINDOW = "floating_window_enabled"
+    private val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
     private val PREF_LAST_DEVICE_ADDRESS = "last_device_address"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,25 +70,47 @@ class MainActivity : AppCompatActivity() {
         if (isFloatingWindowEnabled()) {
             checkOverlayPermission()
         }
+
+        applyHideFromRecents(isHideFromRecentsEnabled())
     }
 
     private fun isFloatingWindowEnabled(): Boolean {
-        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(PREF_FLOATING_WINDOW, false)
     }
 
     private fun setFloatingWindowEnabled(enabled: Boolean) {
-        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(PREF_FLOATING_WINDOW, enabled).apply()
     }
 
+    private fun isHideFromRecentsEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(PREF_HIDE_FROM_RECENTS, false)
+    }
+
+    private fun setHideFromRecentsEnabled(enabled: Boolean) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_HIDE_FROM_RECENTS, enabled).apply()
+    }
+
+    private fun applyHideFromRecents(exclude: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            if (tasks.isNotEmpty()) {
+                tasks[0].setExcludeFromRecents(exclude)
+            }
+        }
+    }
+
     private fun saveLastDeviceAddress(address: String) {
-        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(PREF_LAST_DEVICE_ADDRESS, address).apply()
     }
 
     private fun getLastDeviceAddress(): String? {
-        val prefs = getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(PREF_LAST_DEVICE_ADDRESS, null)
     }
 
@@ -135,6 +162,7 @@ class MainActivity : AppCompatActivity() {
         bmsDataTextView = findViewById(R.id.textViewBmsData)
         scanButton = findViewById(R.id.buttonScanBle)
         floatingWindowSwitch = findViewById(R.id.switchFloatingWindow)
+        hideFromRecentsSwitch = findViewById(R.id.switchHideFromRecents)
         
         floatingWindowSwitch.isChecked = isFloatingWindowEnabled()
         floatingWindowSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -145,10 +173,16 @@ class MainActivity : AppCompatActivity() {
                 stopFloatingWindowService()
             }
         }
+
+        hideFromRecentsSwitch.isChecked = isHideFromRecentsEnabled()
+        hideFromRecentsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setHideFromRecentsEnabled(isChecked)
+            applyHideFromRecents(isChecked)
+        }
         
         bleDeviceAdapter = BleDeviceAdapter(this, discoveredDevices) { device ->
             saveLastDeviceAddress(device.address)
-            val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             val deviceObj = bluetoothManager.adapter.getRemoteDevice(device.address)
             bmsBluetoothManager.connect(deviceObj)
             scanDialog?.dismiss()
@@ -160,13 +194,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initModules() {
-        val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
 
         locationHelper = LocationHelper(this) { location ->
             currentSpeed = location.speed * 3.6
             gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(currentSpeed)
-            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent)
+            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff)
         }
 
         bleScanner = BleScanner(this, bluetoothAdapter,
@@ -237,11 +271,13 @@ class MainActivity : AppCompatActivity() {
     private fun updateBmsUi(data: com.zjsf.gps_ant_bms.model.BmsData) {
         currentVoltage = data.totalVoltage
         currentCurrent = data.current
-        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent)
+        currentVoltageDiff = data.voltageDiff
+        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff)
 
         val sb = StringBuilder()
         sb.append("--- BMS Status ---\n")
         sb.append("Total Voltage: %.2f V\n".format(data.totalVoltage))
+        sb.append("Voltage Diff:  %d mV\n".format(data.voltageDiff))
         sb.append("Current:       %.1f A\n".format(data.current))
         sb.append("Power:         %.1f W\n".format(data.power))
         sb.append("SOC:           %d %%\n".format(data.soc))

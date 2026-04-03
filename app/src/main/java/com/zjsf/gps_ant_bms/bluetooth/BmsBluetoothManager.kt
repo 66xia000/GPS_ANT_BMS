@@ -24,7 +24,7 @@ class BmsBluetoothManager(
     private var isPolling = false
     
     private var lastConnectedDevice: BluetoothDevice? = null
-    private var isAutoReconnectEnabled = false
+    private var isAutoReconnectEnabled = true
     private val RECONNECT_DELAY: Long = 2000 // 2 seconds
 
     // 常量定义

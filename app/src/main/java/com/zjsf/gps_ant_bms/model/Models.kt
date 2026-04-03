@@ -14,5 +14,6 @@ data class BmsData(
     val temperatures: List<Int>,
     val soh: Int = 0,
     val power: Double = 0.0,
-    val runtime: Long = 0L
+    val runtime: Long = 0L,
+    val voltageDiff: Int = 0
 )
