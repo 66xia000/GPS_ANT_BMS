@@ -40,6 +40,26 @@
             android:fontFamily="monospace" />
     </ScrollView>
 
+    <Switch
+        android:id="@+id/switchHideFromRecents"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Hide from Recent Tasks"
+        app:layout_constraintBottom_toTopOf="@id/switchFloatingWindow"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Switch
+        android:id="@+id/switchFloatingWindow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Enable Floating Window"
+        app:layout_constraintBottom_toTopOf="@id/buttonScanBle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <Button
         android:id="@+id/buttonScanBle"
         android:layout_width="wrap_content"

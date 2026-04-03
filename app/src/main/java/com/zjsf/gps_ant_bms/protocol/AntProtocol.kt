@@ -34,6 +34,12 @@ object AntProtocol {
                 offset += 2
             }
 
+            // 计算总电压 (mV 转 V) 和 电压差 (mV)
+            val calculatedTotalVoltage = cellVoltages.sum().toDouble() / 1000.0
+            val maxV = if (cellVoltages.isNotEmpty()) cellVoltages.maxOrNull() ?: 0 else 0
+            val minV = if (cellVoltages.isNotEmpty()) cellVoltages.minOrNull() ?: 0 else 0
+            val voltageDiff = maxV - minV
+
             // 3. 解析传感器温度
             val temperatures = mutableListOf<Int>()
             for (i in 0 until numTemp) {
@@ -46,8 +52,8 @@ object AntProtocol {
             val balancerTemp = i16(offset + 2)
             offset += 4
 
-            // 5. 总电参数解析
-            val totalVoltage = u16(offset) * 0.01 // V
+            // 5. 总电参数解析 (跳过原始总电压字段，使用计算出的值)
+            // val totalVoltage = u16(offset) * 0.01 // V
             offset += 2
 
             val current = i16(offset) * 0.1 // A
@@ -91,7 +97,7 @@ object AntProtocol {
             }
 
             return BmsData(
-                totalVoltage = totalVoltage,
+                totalVoltage = calculatedTotalVoltage,
                 current = current,
                 soc = soc,
                 capacity = capacity,
@@ -102,7 +108,8 @@ object AntProtocol {
                 temperatures = temperatures,
                 soh = soh,
                 power = power,
-                runtime = runtime
+                runtime = runtime,
+                voltageDiff = voltageDiff
             )
         } catch (e: Exception) {
             return null

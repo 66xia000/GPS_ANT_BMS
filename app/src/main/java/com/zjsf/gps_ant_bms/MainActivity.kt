@@ -1,7 +1,9 @@
 package com.zjsf.gps_ant_bms
 
 import android.Manifest
+import android.app.ActivityManager
 import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -27,17 +29,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gpsSpeedTextView: TextView
     private lateinit var bmsDataTextView: TextView
     private lateinit var scanButton: android.widget.Button
+    private lateinit var floatingWindowSwitch: android.widget.Switch
+    private lateinit var hideFromRecentsSwitch: android.widget.Switch
     
     private lateinit var locationHelper: LocationHelper
     private lateinit var bleScanner: BleScanner
     private lateinit var bmsBluetoothManager: BmsBluetoothManager
     
+    private var currentSpeed: Double = 0.0
+    private var currentVoltage: Double = 0.000
+    private var currentCurrent: Double = 0.0
+    private var currentVoltageDiff: Int = 0
+
     private lateinit var bleDeviceAdapter: BleDeviceAdapter
     private val discoveredDevices = mutableListOf<BleDevice>()
     private var scanDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val PERMISSION_REQUEST_CODE = 100
+    private val OVERLAY_PERMISSION_REQUEST_CODE = 101
     private val SCAN_PERIOD: Long = 5000 // 5 seconds
+    private val PREFS_NAME = "BmsPrefs"
+    private val PREF_FLOATING_WINDOW = "floating_window_enabled"
+    private val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
+    private val PREF_LAST_DEVICE_ADDRESS = "last_device_address"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,15 +66,123 @@ class MainActivity : AppCompatActivity() {
         initViews()
         initModules()
         checkPermissions()
+        
+        if (isFloatingWindowEnabled()) {
+            checkOverlayPermission()
+        }
+
+        applyHideFromRecents(isHideFromRecentsEnabled())
+    }
+
+    private fun isFloatingWindowEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(PREF_FLOATING_WINDOW, false)
+    }
+
+    private fun setFloatingWindowEnabled(enabled: Boolean) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_FLOATING_WINDOW, enabled).apply()
+    }
+
+    private fun isHideFromRecentsEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(PREF_HIDE_FROM_RECENTS, false)
+    }
+
+    private fun setHideFromRecentsEnabled(enabled: Boolean) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_HIDE_FROM_RECENTS, enabled).apply()
+    }
+
+    private fun applyHideFromRecents(exclude: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            if (tasks.isNotEmpty()) {
+                tasks[0].setExcludeFromRecents(exclude)
+            }
+        }
+    }
+
+    private fun saveLastDeviceAddress(address: String) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(PREF_LAST_DEVICE_ADDRESS, address).apply()
+    }
+
+    private fun getLastDeviceAddress(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(PREF_LAST_DEVICE_ADDRESS, null)
+    }
+
+    private fun checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!android.provider.Settings.canDrawOverlays(this)) {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST_CODE)
+            } else {
+                startFloatingWindowService()
+            }
+        } else {
+            startFloatingWindowService()
+        }
+    }
+
+    private fun startFloatingWindowService() {
+        val intent = android.content.Intent(this, FloatingWindowService::class.java)
+        startService(intent)
+    }
+
+    private fun stopFloatingWindowService() {
+        val intent = android.content.Intent(this, FloatingWindowService::class.java)
+        stopService(intent)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == OVERLAY_PERMISSION_REQUEST_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (android.provider.Settings.canDrawOverlays(this)) {
+                    if (isFloatingWindowEnabled()) {
+                        startFloatingWindowService()
+                    }
+                } else {
+                    // Permission denied, uncheck the switch
+                    floatingWindowSwitch.isChecked = false
+                    setFloatingWindowEnabled(false)
+                }
+            }
+        }
     }
 
     private fun initViews() {
         gpsSpeedTextView = findViewById(R.id.textViewGpsSpeed)
         bmsDataTextView = findViewById(R.id.textViewBmsData)
         scanButton = findViewById(R.id.buttonScanBle)
+        floatingWindowSwitch = findViewById(R.id.switchFloatingWindow)
+        hideFromRecentsSwitch = findViewById(R.id.switchHideFromRecents)
+        
+        floatingWindowSwitch.isChecked = isFloatingWindowEnabled()
+        floatingWindowSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setFloatingWindowEnabled(isChecked)
+            if (isChecked) {
+                checkOverlayPermission()
+            } else {
+                stopFloatingWindowService()
+            }
+        }
+
+        hideFromRecentsSwitch.isChecked = isHideFromRecentsEnabled()
+        hideFromRecentsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setHideFromRecentsEnabled(isChecked)
+            applyHideFromRecents(isChecked)
+        }
         
         bleDeviceAdapter = BleDeviceAdapter(this, discoveredDevices) { device ->
-            val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
+            saveLastDeviceAddress(device.address)
+            val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             val deviceObj = bluetoothManager.adapter.getRemoteDevice(device.address)
             bmsBluetoothManager.connect(deviceObj)
             scanDialog?.dismiss()
@@ -72,12 +194,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initModules() {
-        val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
 
         locationHelper = LocationHelper(this) { location ->
-            val speed = location.speed * 3.6
-            gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(speed)
+            currentSpeed = location.speed * 3.6
+            gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(currentSpeed)
+            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff)
         }
 
         bleScanner = BleScanner(this, bluetoothAdapter,
@@ -128,10 +251,33 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun reconnectLastDevice() {
+        val lastAddress = getLastDeviceAddress()
+        if (lastAddress != null) {
+            val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val bluetoothAdapter = bluetoothManager.adapter
+            if (bluetoothAdapter != null && bluetoothAdapter.isEnabled) {
+                try {
+                    val device = bluetoothAdapter.getRemoteDevice(lastAddress)
+                    android.util.Log.i("MainActivity", "自动连接上次设备: $lastAddress")
+                    bmsBluetoothManager.connect(device)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "自动连接失败: ${e.message}")
+                }
+            }
+        }
+    }
+
     private fun updateBmsUi(data: com.zjsf.gps_ant_bms.model.BmsData) {
+        currentVoltage = data.totalVoltage
+        currentCurrent = data.current
+        currentVoltageDiff = data.voltageDiff
+        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff)
+
         val sb = StringBuilder()
         sb.append("--- BMS Status ---\n")
         sb.append("Total Voltage: %.2f V\n".format(data.totalVoltage))
+        sb.append("Voltage Diff:  %d mV\n".format(data.voltageDiff))
         sb.append("Current:       %.1f A\n".format(data.current))
         sb.append("Power:         %.1f W\n".format(data.power))
         sb.append("SOC:           %d %%\n".format(data.soc))
@@ -177,6 +323,7 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
             locationHelper.startLocationUpdates()
+            reconnectLastDevice()
         }
     }
 
@@ -185,6 +332,7 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 locationHelper.startLocationUpdates()
+                reconnectLastDevice()
             }
         }
     }
