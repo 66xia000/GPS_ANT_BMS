@@ -45,6 +45,22 @@ class MainActivity : AppCompatActivity() {
     private val discoveredDevices = mutableListOf<BleDevice>()
     private var scanDialog: androidx.appcompat.app.AlertDialog? = null
 
+    private val overlayPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (android.provider.Settings.canDrawOverlays(this)) {
+                if (isFloatingWindowEnabled()) {
+                    startFloatingWindowService()
+                }
+            } else {
+                // Permission denied, uncheck the switch
+                floatingWindowSwitch.isChecked = false
+                setFloatingWindowEnabled(false)
+            }
+        }
+    }
+
     private val PERMISSION_REQUEST_CODE = 100
     private val OVERLAY_PERMISSION_REQUEST_CODE = 101
     private val SCAN_PERIOD: Long = 5000 // 5 seconds
@@ -121,7 +137,7 @@ class MainActivity : AppCompatActivity() {
                     android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     android.net.Uri.parse("package:$packageName")
                 )
-                startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST_CODE)
+                overlayPermissionLauncher.launch(intent)
             } else {
                 startFloatingWindowService()
             }
@@ -138,23 +154,6 @@ class MainActivity : AppCompatActivity() {
     private fun stopFloatingWindowService() {
         val intent = android.content.Intent(this, FloatingWindowService::class.java)
         stopService(intent)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == OVERLAY_PERMISSION_REQUEST_CODE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (android.provider.Settings.canDrawOverlays(this)) {
-                    if (isFloatingWindowEnabled()) {
-                        startFloatingWindowService()
-                    }
-                } else {
-                    // Permission denied, uncheck the switch
-                    floatingWindowSwitch.isChecked = false
-                    setFloatingWindowEnabled(false)
-                }
-            }
-        }
     }
 
     private fun initViews() {
