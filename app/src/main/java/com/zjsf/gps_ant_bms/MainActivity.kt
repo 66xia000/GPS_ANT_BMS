@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var currentVoltage: Double = 0.000
     private var currentCurrent: Double = 0.0
     private var currentVoltageDiff: Int = 0
+    private var currentSoc: Int = 0
 
     private lateinit var bleDeviceAdapter: BleDeviceAdapter
     private val discoveredDevices = mutableListOf<BleDevice>()
@@ -199,7 +200,7 @@ class MainActivity : AppCompatActivity() {
         locationHelper = LocationHelper(this) { location ->
             currentSpeed = location.speed * 3.6
             gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(currentSpeed)
-            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff)
+            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff, currentSoc)
         }
 
         bleScanner = BleScanner(this, bluetoothAdapter,
@@ -271,7 +272,8 @@ class MainActivity : AppCompatActivity() {
         currentVoltage = data.totalVoltage
         currentCurrent = data.current
         currentVoltageDiff = data.voltageDiff
-        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff)
+        currentSoc = data.soc
+        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff, currentSoc)
 
         val sb = StringBuilder()
         sb.append("--- BMS Status ---\n")

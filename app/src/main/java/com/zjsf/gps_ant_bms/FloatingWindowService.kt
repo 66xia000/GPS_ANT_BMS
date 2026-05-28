@@ -22,8 +22,8 @@ class FloatingWindowService : Service() {
     companion object {
         private var instance: FloatingWindowService? = null
 
-        fun updateData(speed: Double, voltage: Double, current: Double, voltageDiff: Int = 0) {
-            instance?.updateDisplay(speed, voltage, current, voltageDiff)
+        fun updateData(speed: Double, voltage: Double, current: Double, voltageDiff: Int = 0, soc: Int = 0) {
+            instance?.updateDisplay(speed, voltage, current, voltageDiff, soc)
         }
     }
 
@@ -87,12 +87,13 @@ class FloatingWindowService : Service() {
         })
     }
 
-    fun updateDisplay(speed: Double, voltage: Double, current: Double, voltageDiff: Int = 0) {
+    fun updateDisplay(speed: Double, voltage: Double, current: Double, voltageDiff: Int = 0, soc: Int = 0) {
         floatingView?.let {
             it.findViewById<TextView>(R.id.tv_speed_value).text = "%.2f".format(speed)
             it.findViewById<TextView>(R.id.tv_voltage_value).text = "%.3f".format(voltage)
             it.findViewById<TextView>(R.id.tv_current_value).text = "%.2f".format(current)
             it.findViewById<TextView>(R.id.tv_diff_value).text = voltageDiff.toString()
+            it.findViewById<TextView>(R.id.tv_soc_value)?.text = soc.toString()
         }
     }
 
