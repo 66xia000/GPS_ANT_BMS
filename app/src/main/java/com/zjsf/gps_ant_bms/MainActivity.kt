@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startFloatingWindowService() {
         val intent = android.content.Intent(this, FloatingWindowService::class.java)
-        startService(intent)
+        androidx.core.content.ContextCompat.startForegroundService(this, intent)
     }
 
     private fun stopFloatingWindowService() {
