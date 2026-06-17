@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startFloatingWindowService() {
         val intent = android.content.Intent(this, FloatingWindowService::class.java)
-        startService(intent)
+        androidx.core.content.ContextCompat.startForegroundService(this, intent)
     }
 
     private fun stopFloatingWindowService() {
@@ -364,6 +364,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationHelper.startLocationUpdates()
+        }
+        if (isFloatingWindowEnabled()) {
+            checkOverlayPermission()
         }
     }
 
