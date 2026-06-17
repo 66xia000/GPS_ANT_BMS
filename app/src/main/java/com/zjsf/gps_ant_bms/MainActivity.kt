@@ -365,6 +365,9 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationHelper.startLocationUpdates()
         }
+        if (isFloatingWindowEnabled()) {
+            checkOverlayPermission()
+        }
     }
 
     override fun onPause() {

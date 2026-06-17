@@ -37,6 +37,10 @@ class FloatingWindowService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
+    }
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -76,6 +80,8 @@ class FloatingWindowService : Service() {
     }
 
     private fun showFloatingWindow() {
+        if (floatingView != null) return // Prevent multiple views
+
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
         floatingView = inflater.inflate(R.layout.layout_floating_window, null)
@@ -90,12 +96,12 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
             PixelFormat.TRANSLUCENT
         )
 
-        params?.gravity = Gravity.TOP or Gravity.START
-        params?.x = 100
+        params?.gravity = Gravity.TOP or Gravity.END
+        params?.x = 50
         params?.y = 100
 
         windowManager?.addView(floatingView, params)
