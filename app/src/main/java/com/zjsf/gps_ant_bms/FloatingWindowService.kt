@@ -101,7 +101,7 @@ class FloatingWindowService : Service() {
         )
 
         params?.gravity = Gravity.TOP or Gravity.END
-        params?.x = 50
+        params?.x = 100
         params?.y = 100
 
         windowManager?.addView(floatingView, params)
@@ -122,7 +122,7 @@ class FloatingWindowService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params?.x = initialX + (event.rawX - initialTouchX).toInt()
+                        params?.x = initialX - (event.rawX - initialTouchX).toInt()
                         params?.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager?.updateViewLayout(floatingView, params)
                         return true
