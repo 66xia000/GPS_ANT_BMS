@@ -5,8 +5,12 @@ import android.app.ActivityManager
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -299,12 +303,45 @@ class MainActivity : AppCompatActivity() {
         sb.append("Runtime:       %d天 %02d:%02d:%02d\n".format(d, h, m, s))
 
         sb.append("\n--- Cell Voltages ---\n")
+
+        // 计算电压最高的 3 个和最低的 3 个电池单体下标
+        val highest3 = data.cellVoltages.indices
+            .sortedByDescending { data.cellVoltages[it] }
+            .take(3)
+            .toSet()
+        val lowest3 = data.cellVoltages.indices
+            .sortedBy { data.cellVoltages[it] }
+            .take(3)
+            .toSet()
+
+        // 记录需要着色的文本范围（以整行处理，便于一眼区分）
+        val colorSpans = mutableListOf<Pair<IntRange, Int>>()
         data.cellVoltages.forEachIndexed { index, voltage ->
+            val start = sb.length
             sb.append("Cell %02d: %d mV\n".format(index + 1, voltage))
+            val end = sb.length
+            val color = when {
+                index in highest3 -> Color.RED
+                index in lowest3  -> Color.GREEN
+                else -> null
+            }
+            if (color != null) {
+                colorSpans.add(start until end to color)
+            }
+        }
+
+        val spannable = SpannableString(sb.toString())
+        colorSpans.forEach { (range, color) ->
+            spannable.setSpan(
+                ForegroundColorSpan(color),
+                range.first,
+                range.last + 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
         }
 
         runOnUiThread {
-            bmsDataTextView.text = sb.toString()
+            bmsDataTextView.text = spannable
         }
     }
 
