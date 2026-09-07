@@ -3,8 +3,8 @@ package com.zjsf.gps_ant_bms
 import android.Manifest
 import android.app.ActivityManager
 import android.bluetooth.BluetoothProfile
-import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -23,10 +23,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.zjsf.gps_ant_bms.bluetooth.BleScanner
-import com.zjsf.gps_ant_bms.bluetooth.BmsBluetoothManager
-import com.zjsf.gps_ant_bms.location.LocationHelper
+import com.zjsf.gps_ant_bms.data.BmsDataRepository
 import com.zjsf.gps_ant_bms.model.BleDevice
-import com.zjsf.gps_ant_bms.protocol.AntProtocol
 import com.zjsf.gps_ant_bms.ui.BleDeviceAdapter
 
 class MainActivity : AppCompatActivity() {
@@ -38,7 +36,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textCurrent: TextView
     private lateinit var textPower: TextView
     private lateinit var textVoltageDiff: TextView
-    private lateinit var textSoh: TextView
     private lateinit var textCapacity: TextView
     private lateinit var textRemaining: TextView
     private lateinit var textRuntime: TextView
@@ -50,20 +47,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scanButton: android.widget.Button
     private lateinit var floatingWindowSwitch: android.widget.Switch
     private lateinit var hideFromRecentsSwitch: android.widget.Switch
-    
-    private lateinit var locationHelper: LocationHelper
-    private lateinit var bleScanner: BleScanner
-    private lateinit var bmsBluetoothManager: BmsBluetoothManager
-    
-    private var currentSpeed: Double = 0.0
-    private var currentVoltage: Double = 0.000
-    private var currentCurrent: Double = 0.0
-    private var currentVoltageDiff: Int = 0
-    private var currentSoc: Int = 0
 
+    private lateinit var bleScanner: BleScanner
     private lateinit var bleDeviceAdapter: BleDeviceAdapter
     private val discoveredDevices = mutableListOf<BleDevice>()
     private var scanDialog: androidx.appcompat.app.AlertDialog? = null
+
+    private val repository = BmsDataRepository.instance
 
     private val overlayPermissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -82,12 +72,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val PERMISSION_REQUEST_CODE = 100
-    private val OVERLAY_PERMISSION_REQUEST_CODE = 101
     private val SCAN_PERIOD: Long = 5000 // 5 seconds
     private val PREFS_NAME = "BmsPrefs"
     private val PREF_FLOATING_WINDOW = "floating_window_enabled"
     private val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
     private val PREF_LAST_DEVICE_ADDRESS = "last_device_address"
+
+    private val repositoryListener: (BmsDataRepository) -> Unit = { applyRepositoryState() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +93,7 @@ class MainActivity : AppCompatActivity() {
         initViews()
         initModules()
         checkPermissions()
-        
+
         if (isFloatingWindowEnabled()) {
             checkOverlayPermission()
         }
@@ -110,26 +101,66 @@ class MainActivity : AppCompatActivity() {
         applyHideFromRecents(isHideFromRecentsEnabled())
     }
 
-    private fun isFloatingWindowEnabled(): Boolean {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(PREF_FLOATING_WINDOW, false)
+    override fun onStart() {
+        super.onStart()
+        repository.addListener(repositoryListener)
+        applyRepositoryState()
     }
+
+    override fun onStop() {
+        repository.removeListener(repositoryListener)
+        super.onStop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 数据采集由前台服务承担，这里只负责确保服务按需运行：
+        // 悬浮窗开着 → 保证服务在跑；否则有上次设备时也启动服务以便自动重连并刷新主界面。
+        if (isFloatingWindowEnabled()) {
+            checkOverlayPermission()
+        } else if (getLastDeviceAddress() != null) {
+            startFloatingWindowService()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        bleScanner.stopScan()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bleScanner.stopScan()
+        // 数据源与连接由前台服务持有，此处不主动 disconnect，
+        // 悬浮窗开启时服务会在后台继续监控。
+    }
+
+    // ---------------------------------------------------------------------
+    // 偏好
+    // ---------------------------------------------------------------------
+    private fun isFloatingWindowEnabled(): Boolean = getPrefs().getBoolean(PREF_FLOATING_WINDOW, false)
 
     private fun setFloatingWindowEnabled(enabled: Boolean) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(PREF_FLOATING_WINDOW, enabled).apply()
+        getPrefs().edit().putBoolean(PREF_FLOATING_WINDOW, enabled).apply()
     }
 
-    private fun isHideFromRecentsEnabled(): Boolean {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(PREF_HIDE_FROM_RECENTS, false)
-    }
+    private fun isHideFromRecentsEnabled(): Boolean = getPrefs().getBoolean(PREF_HIDE_FROM_RECENTS, false)
 
     private fun setHideFromRecentsEnabled(enabled: Boolean) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(PREF_HIDE_FROM_RECENTS, enabled).apply()
+        getPrefs().edit().putBoolean(PREF_HIDE_FROM_RECENTS, enabled).apply()
     }
 
+    private fun getPrefs() = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun saveLastDeviceAddress(address: String) {
+        getPrefs().edit().putString(PREF_LAST_DEVICE_ADDRESS, address).apply()
+    }
+
+    private fun getLastDeviceAddress(): String? = getPrefs().getString(PREF_LAST_DEVICE_ADDRESS, null)
+
+    // ---------------------------------------------------------------------
+    // 悬浮窗服务控制
+    // ---------------------------------------------------------------------
     private fun applyHideFromRecents(exclude: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -140,20 +171,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveLastDeviceAddress(address: String) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(PREF_LAST_DEVICE_ADDRESS, address).apply()
-    }
-
-    private fun getLastDeviceAddress(): String? {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(PREF_LAST_DEVICE_ADDRESS, null)
-    }
-
     private fun checkOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!android.provider.Settings.canDrawOverlays(this)) {
-                val intent = android.content.Intent(
+                val intent = Intent(
                     android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     android.net.Uri.parse("package:$packageName")
                 )
@@ -166,16 +187,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startFloatingWindowService() {
-        val intent = android.content.Intent(this, FloatingWindowService::class.java)
-        androidx.core.content.ContextCompat.startForegroundService(this, intent)
+    /** 启动（或通知已运行的）前台服务来承担数据采集/监控。 */
+    private fun startFloatingWindowService(address: String? = getLastDeviceAddress()) {
+        val intent = Intent(this, FloatingWindowService::class.java)
+        if (address != null) {
+            intent.putExtra(FloatingWindowService.EXTRA_DEVICE_ADDRESS, address)
+        }
+        ContextCompat.startForegroundService(this, intent)
     }
 
-    private fun stopFloatingWindowService() {
-        val intent = android.content.Intent(this, FloatingWindowService::class.java)
-        stopService(intent)
-    }
-
+    // ---------------------------------------------------------------------
+    // 视图与模块
+    // ---------------------------------------------------------------------
     private fun initViews() {
         gpsSpeedTextView = findViewById(R.id.textViewGpsSpeed)
         textConnectionStatus = findViewById(R.id.textConnectionStatus)
@@ -184,7 +207,6 @@ class MainActivity : AppCompatActivity() {
         textCurrent = findViewById(R.id.textCurrent)
         textPower = findViewById(R.id.textPower)
         textVoltageDiff = findViewById(R.id.textVoltageDiff)
-        textSoh = findViewById(R.id.textSoh)
         textCapacity = findViewById(R.id.textCapacity)
         textRemaining = findViewById(R.id.textRemaining)
         textRuntime = findViewById(R.id.textRuntime)
@@ -196,14 +218,14 @@ class MainActivity : AppCompatActivity() {
         scanButton = findViewById(R.id.buttonScanBle)
         floatingWindowSwitch = findViewById(R.id.switchFloatingWindow)
         hideFromRecentsSwitch = findViewById(R.id.switchHideFromRecents)
-        
+
         floatingWindowSwitch.isChecked = isFloatingWindowEnabled()
         floatingWindowSwitch.setOnCheckedChangeListener { _, isChecked ->
             setFloatingWindowEnabled(isChecked)
             if (isChecked) {
                 checkOverlayPermission()
             } else {
-                stopFloatingWindowService()
+                FloatingWindowService.onFloatingWindowPrefChanged(false)
             }
         }
 
@@ -212,29 +234,20 @@ class MainActivity : AppCompatActivity() {
             setHideFromRecentsEnabled(isChecked)
             applyHideFromRecents(isChecked)
         }
-        
+
         bleDeviceAdapter = BleDeviceAdapter(this, discoveredDevices) { device ->
             saveLastDeviceAddress(device.address)
-            val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-            val deviceObj = bluetoothManager.adapter.getRemoteDevice(device.address)
-            bmsBluetoothManager.connect(deviceObj)
+            // 通知（或启动）前台服务连接所选设备，服务持有 BLE 连接。
+            startFloatingWindowService(device.address)
             scanDialog?.dismiss()
         }
-        
-        scanButton.setOnClickListener {
-            showScanDialog()
-        }
+
+        scanButton.setOnClickListener { showScanDialog() }
     }
 
     private fun initModules() {
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
-
-        locationHelper = LocationHelper(this) { location ->
-            currentSpeed = location.speed * 3.6
-            gpsSpeedTextView.text = "%.1f".format(currentSpeed)
-            FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff, currentSoc)
-        }
 
         bleScanner = BleScanner(this, bluetoothAdapter,
             onDeviceFound = { result ->
@@ -249,7 +262,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 val deviceAddress = result.device.address
                 val rssi = result.rssi
-                
+
                 val existingIndex = discoveredDevices.indexOfFirst { it.address == deviceAddress }
                 if (existingIndex != -1) {
                     discoveredDevices[existingIndex] = discoveredDevices[existingIndex].copy(rssi = rssi)
@@ -268,117 +281,10 @@ class MainActivity : AppCompatActivity() {
             },
             onScanStopped = {
                 runOnUiThread {
-                    scanDialog?.findViewById<android.widget.ProgressBar>(R.id.progressBarScanning)?.visibility = View.GONE
+                    scanDialog?.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressBarScanning)?.visibility = View.GONE
                 }
             }
         )
-
-        bmsBluetoothManager = BmsBluetoothManager(this,
-            onDataReceived = { data ->
-                val bmsData = AntProtocol.processAntData(data)
-                bmsData?.let { updateBmsUi(it) }
-            },
-            onConnectionStateChanged = { newState ->
-                val (chipText, color) = when (newState) {
-                    BluetoothProfile.STATE_CONNECTED -> "已连接" to Color.rgb(0x2E, 0x7D, 0x32)
-                    BluetoothProfile.STATE_CONNECTING -> "连接中" to Color.rgb(0x61, 0x61, 0x61)
-                    BluetoothProfile.STATE_DISCONNECTED -> "未连接" to Color.rgb(0x9E, 0x9E, 0x9E)
-                    else -> "未连接" to Color.rgb(0x9E, 0x9E, 0x9E)
-                }
-                runOnUiThread {
-                    textConnectionStatus.text = chipText
-                    textConnectionStatus.setTextColor(color)
-                }
-            }
-        )
-    }
-
-    private fun reconnectLastDevice() {
-        val lastAddress = getLastDeviceAddress()
-        if (lastAddress != null) {
-            val bluetoothManager = getSystemService(android.content.Context.BLUETOOTH_SERVICE) as BluetoothManager
-            val bluetoothAdapter = bluetoothManager.adapter
-            if (bluetoothAdapter != null && bluetoothAdapter.isEnabled) {
-                try {
-                    val device = bluetoothAdapter.getRemoteDevice(lastAddress)
-                    android.util.Log.i("MainActivity", "自动连接上次设备: $lastAddress")
-                    bmsBluetoothManager.connect(device)
-                } catch (e: Exception) {
-                    android.util.Log.e("MainActivity", "自动连接失败: ${e.message}")
-                }
-            }
-        }
-    }
-
-    private fun updateBmsUi(data: com.zjsf.gps_ant_bms.model.BmsData) {
-        currentVoltage = data.totalVoltage
-        currentCurrent = data.current
-        currentVoltageDiff = data.voltageDiff
-        currentSoc = data.soc
-        FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff, currentSoc)
-
-        runOnUiThread {
-            textTotalVoltage.text = "%.2f".format(data.totalVoltage)
-            textSoc.text = data.soc.toString()
-            progressSoc.progress = data.soc.coerceIn(0, 100)
-            textCurrent.text = "%.1f A".format(data.current)
-            textPower.text = "%.1f W".format(data.power)
-            textVoltageDiff.text = "%d mV".format(data.voltageDiff)
-            textSoh.text = "%d %%".format(data.soh)
-            textCapacity.text = "%.2f Ah".format(data.capacity)
-            textRemaining.text = "%.2f Ah".format(data.remainingCharge)
-
-            val d = data.runtime / 86400
-            val h = (data.runtime % 86400) / 3600
-            val m = (data.runtime % 3600) / 60
-            val s = data.runtime % 60
-            textRuntime.text = "%d天 %02d:%02d:%02d".format(d, h, m, s)
-
-            textMosTemp.text = "%d °C".format(data.mosTemp)
-            textBalancerTemp.text = "%d °C".format(data.balancerTemp)
-            textTemps.text = if (data.temperatures.isNotEmpty()) {
-                data.temperatures.joinToString(", ") { "$it °C" }
-            } else {
-                "--"
-            }
-
-            // ---- 单体电压（等宽文本 + 高低着色） ----
-            val sb = StringBuilder()
-            val highest3 = data.cellVoltages.indices
-                .sortedByDescending { data.cellVoltages[it] }
-                .take(3)
-                .toSet()
-            val lowest3 = data.cellVoltages.indices
-                .sortedBy { data.cellVoltages[it] }
-                .take(3)
-                .toSet()
-
-            val colorSpans = mutableListOf<Pair<IntRange, Int>>()
-            data.cellVoltages.forEachIndexed { index, voltage ->
-                val start = sb.length
-                sb.append("Cell %02d  %d mV\n".format(index + 1, voltage))
-                val end = sb.length
-                val color = when {
-                    index in highest3 -> Color.RED
-                    index in lowest3  -> Color.GREEN
-                    else -> null
-                }
-                if (color != null) {
-                    colorSpans.add(start until end to color)
-                }
-            }
-
-            val spannable = SpannableString(sb.toString())
-            colorSpans.forEach { (range, color) ->
-                spannable.setSpan(
-                    ForegroundColorSpan(color),
-                    range.first,
-                    range.last + 1,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-            }
-            textCellVoltages.text = spannable
-        }
     }
 
     private fun checkPermissions() {
@@ -388,16 +294,15 @@ class MainActivity : AppCompatActivity() {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN)
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
-        
+
         val missingPermissions = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        
+
         if (missingPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
-            locationHelper.startLocationUpdates()
-            reconnectLastDevice()
+            afterPermissionsGranted()
         }
     }
 
@@ -405,9 +310,16 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                locationHelper.startLocationUpdates()
-                reconnectLastDevice()
+                afterPermissionsGranted()
             }
+        }
+    }
+
+    private fun afterPermissionsGranted() {
+        if (isFloatingWindowEnabled()) {
+            checkOverlayPermission()
+        } else if (getLastDeviceAddress() != null) {
+            startFloatingWindowService()
         }
     }
 
@@ -433,27 +345,89 @@ class MainActivity : AppCompatActivity() {
         bleScanner.startScan(SCAN_PERIOD)
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locationHelper.startLocationUpdates()
+    // ---------------------------------------------------------------------
+    // 渲染（数据来自共享仓库）
+    // ---------------------------------------------------------------------
+    private fun applyRepositoryState() {
+        gpsSpeedTextView.text = "%.1f".format(repository.getSpeedKmh())
+        renderConnectionStatus(repository.getConnectionState())
+
+        val data = repository.getBmsData()
+        textTotalVoltage.text = "%.2f".format(data.totalVoltage)
+        textSoc.text = data.soc.toString()
+        progressSoc.progress = data.soc.coerceIn(0, 100)
+        textCurrent.text = "%.1f A".format(data.current)
+        textPower.text = "%.1f W".format(data.power)
+        textVoltageDiff.text = "%d mV".format(data.voltageDiff)
+        textCapacity.text = "%.2f Ah".format(data.capacity)
+        textRemaining.text = "%.2f Ah".format(data.remainingCharge)
+
+        val d = data.runtime / 86400
+        val h = (data.runtime % 86400) / 3600
+        val m = (data.runtime % 3600) / 60
+        val s = data.runtime % 60
+        textRuntime.text = "%d天 %02d:%02d:%02d".format(d, h, m, s)
+
+        textMosTemp.text = "%d °C".format(data.mosTemp)
+        textBalancerTemp.text = "%d °C".format(data.balancerTemp)
+        textTemps.text = if (data.temperatures.isNotEmpty()) {
+            data.temperatures.joinToString(", ") { "$it °C" }
+        } else {
+            "--"
         }
-        if (isFloatingWindowEnabled()) {
-            checkOverlayPermission()
+
+        textCellVoltages.text = buildCellVoltages(data.cellVoltages)
+    }
+
+    private fun renderConnectionStatus(state: Int) {
+        val (chipText, color) = when (state) {
+            BluetoothProfile.STATE_CONNECTED -> "已连接" to Color.rgb(0x2E, 0x7D, 0x32)
+            BluetoothProfile.STATE_CONNECTING -> "连接中" to Color.rgb(0x61, 0x61, 0x61)
+            BluetoothProfile.STATE_DISCONNECTED -> "未连接" to Color.rgb(0x9E, 0x9E, 0x9E)
+            else -> "未连接" to Color.rgb(0x9E, 0x9E, 0x9E)
         }
+        textConnectionStatus.text = chipText
+        textConnectionStatus.setTextColor(color)
     }
 
-    override fun onPause() {
-        super.onPause()
-        locationHelper.stopLocationUpdates()
-        bleScanner.stopScan()
-    }
+    private fun buildCellVoltages(cellVoltages: List<Int>): Spannable {
+        val sb = StringBuilder()
 
-    override fun onDestroy() {
-        super.onDestroy()
-        locationHelper.stopLocationUpdates()
-        bleScanner.stopScan()
-        bmsBluetoothManager.disconnect()
-    }
+        // 计算电压最高的 3 个和最低的 3 个电池单体下标
+        val highest3 = cellVoltages.indices
+            .sortedByDescending { cellVoltages[it] }
+            .take(3)
+            .toSet()
+        val lowest3 = cellVoltages.indices
+            .sortedBy { cellVoltages[it] }
+            .take(3)
+            .toSet()
 
+        // 记录需要着色的文本范围
+        val colorSpans = mutableListOf<Pair<IntRange, Int>>()
+        cellVoltages.forEachIndexed { index, voltage ->
+            val start = sb.length
+            sb.append("Cell %02d  %d mV\n".format(index + 1, voltage))
+            val end = sb.length
+            val color = when {
+                index in highest3 -> Color.RED
+                index in lowest3 -> Color.GREEN
+                else -> null
+            }
+            if (color != null) {
+                colorSpans.add(start until end to color)
+            }
+        }
+
+        val spannable = SpannableString(sb.toString())
+        colorSpans.forEach { (range, color) ->
+            spannable.setSpan(
+                ForegroundColorSpan(color),
+                range.first,
+                range.last + 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        return spannable
+    }
 }
