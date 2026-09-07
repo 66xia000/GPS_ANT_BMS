@@ -3,135 +3,164 @@
     android:id="@+id/root_view"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:background="#AA000000"
+    android:background="@drawable/bg_floating_card"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="14dp">
 
-    <!-- 速度行 -->
+    <!-- 速度 -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="bottom">
+        android:gravity="bottom"
+        android:orientation="horizontal">
+
         <TextView
             android:id="@+id/tv_speed_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="0.00"
-            android:textColor="#FFFFFF"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:minWidth="80dp" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="km/h"
-            android:textColor="#CCCCCC"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="4dp" />
-    </LinearLayout>
-    <!-- 电流行 -->
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="bottom"
-        android:layout_marginTop="4dp">
-        <TextView
-            android:id="@+id/tv_current_value"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:minWidth="64dp"
             android:text="0.0"
-            android:textColor="#FF4444"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:minWidth="80dp" />
+            android:textColor="#FFFFFF"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="A"
-            android:textColor="#CCCCCC"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="2dp" />
+            android:layout_marginStart="5dp"
+            android:layout_marginBottom="5dp"
+            android:text="km/h"
+            android:textColor="#9EF0D8"
+            android:textSize="13sp" />
     </LinearLayout>
-    <!-- 电压行 -->
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="8dp"
+        android:background="#25FFFFFF" />
+
+    <!-- 电压 -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="bottom"
-        android:layout_marginTop="4dp">
+        android:orientation="horizontal">
+
         <TextView
             android:id="@+id/tv_voltage_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="0.000"
-            android:textColor="#00FF00"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:minWidth="80dp" />
+            android:minWidth="64dp"
+            android:text="0.00"
+            android:textColor="#6BE7A8"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
+            android:layout_marginBottom="3dp"
             android:text="V"
-            android:textColor="#CCCCCC"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="2dp" />
+            android:textColor="#9EF0D8"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginBottom="3dp"
+            android:text="电流"
+            android:textColor="#8FB3A7"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/tv_current_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="3dp"
+            android:text="0.0"
+            android:textColor="#FFB84D"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:layout_marginBottom="3dp"
+            android:text="A"
+            android:textColor="#9EF0D8"
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- SOC行 -->
+    <!-- SOC + 压差 -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:layout_marginTop="4dp"
         android:gravity="bottom"
-        android:layout_marginTop="4dp">
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="3dp"
+            android:text="SOC"
+            android:textColor="#8FB3A7"
+            android:textSize="11sp" />
+
         <TextView
             android:id="@+id/tv_soc_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="3dp"
             android:text="0"
-            android:textColor="#33B5E5"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:minWidth="80dp" />
+            android:textColor="#5FB8E8"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:layout_marginBottom="3dp"
             android:text="%"
-            android:textColor="#CCCCCC"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="2dp" />
-    </LinearLayout>
+            android:textColor="#9EF0D8"
+            android:textSize="12sp" />
 
-    <!-- 压差行 -->
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="bottom"
-        android:layout_marginTop="4dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginBottom="3dp"
+            android:text="压差"
+            android:textColor="#8FB3A7"
+            android:textSize="11sp" />
+
         <TextView
             android:id="@+id/tv_diff_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="3dp"
             android:text="0"
-            android:textColor="#FF8C00"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:minWidth="80dp" />
+            android:textColor="#FF8C66"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:layout_marginBottom="3dp"
             android:text="mV"
-            android:textColor="#CCCCCC"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="2dp" />
+            android:textColor="#9EF0D8"
+            android:textSize="12sp" />
     </LinearLayout>
 
 </LinearLayout>

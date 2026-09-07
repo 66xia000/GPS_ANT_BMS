@@ -2,6 +2,7 @@ package com.zjsf.gps_ant_bms
 
 import android.Manifest
 import android.app.ActivityManager
+import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -31,7 +32,21 @@ import com.zjsf.gps_ant_bms.ui.BleDeviceAdapter
 class MainActivity : AppCompatActivity() {
 
     private lateinit var gpsSpeedTextView: TextView
-    private lateinit var bmsDataTextView: TextView
+    private lateinit var textConnectionStatus: TextView
+    private lateinit var textTotalVoltage: TextView
+    private lateinit var textSoc: TextView
+    private lateinit var textCurrent: TextView
+    private lateinit var textPower: TextView
+    private lateinit var textVoltageDiff: TextView
+    private lateinit var textSoh: TextView
+    private lateinit var textCapacity: TextView
+    private lateinit var textRemaining: TextView
+    private lateinit var textRuntime: TextView
+    private lateinit var textMosTemp: TextView
+    private lateinit var textBalancerTemp: TextView
+    private lateinit var textTemps: TextView
+    private lateinit var textCellVoltages: TextView
+    private lateinit var progressSoc: com.google.android.material.progressindicator.LinearProgressIndicator
     private lateinit var scanButton: android.widget.Button
     private lateinit var floatingWindowSwitch: android.widget.Switch
     private lateinit var hideFromRecentsSwitch: android.widget.Switch
@@ -163,7 +178,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun initViews() {
         gpsSpeedTextView = findViewById(R.id.textViewGpsSpeed)
-        bmsDataTextView = findViewById(R.id.textViewBmsData)
+        textConnectionStatus = findViewById(R.id.textConnectionStatus)
+        textTotalVoltage = findViewById(R.id.textTotalVoltage)
+        textSoc = findViewById(R.id.textSoc)
+        textCurrent = findViewById(R.id.textCurrent)
+        textPower = findViewById(R.id.textPower)
+        textVoltageDiff = findViewById(R.id.textVoltageDiff)
+        textSoh = findViewById(R.id.textSoh)
+        textCapacity = findViewById(R.id.textCapacity)
+        textRemaining = findViewById(R.id.textRemaining)
+        textRuntime = findViewById(R.id.textRuntime)
+        textMosTemp = findViewById(R.id.textMosTemp)
+        textBalancerTemp = findViewById(R.id.textBalancerTemp)
+        textTemps = findViewById(R.id.textTemps)
+        textCellVoltages = findViewById(R.id.textCellVoltages)
+        progressSoc = findViewById(R.id.progressSoc)
         scanButton = findViewById(R.id.buttonScanBle)
         floatingWindowSwitch = findViewById(R.id.switchFloatingWindow)
         hideFromRecentsSwitch = findViewById(R.id.switchHideFromRecents)
@@ -203,7 +232,7 @@ class MainActivity : AppCompatActivity() {
 
         locationHelper = LocationHelper(this) { location ->
             currentSpeed = location.speed * 3.6
-            gpsSpeedTextView.text = "GPS Speed: %.2f km/h".format(currentSpeed)
+            gpsSpeedTextView.text = "%.1f".format(currentSpeed)
             FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff, currentSoc)
         }
 
@@ -234,7 +263,7 @@ class MainActivity : AppCompatActivity() {
                 discoveredDevices.clear()
                 runOnUiThread {
                     bleDeviceAdapter.notifyDataSetChanged()
-                    scanDialog?.findViewById<android.widget.ProgressBar>(R.id.progressBarScanning)?.visibility = View.VISIBLE
+                    scanDialog?.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressBarScanning)?.visibility = View.VISIBLE
                 }
             },
             onScanStopped = {
@@ -250,7 +279,16 @@ class MainActivity : AppCompatActivity() {
                 bmsData?.let { updateBmsUi(it) }
             },
             onConnectionStateChanged = { newState ->
-                // Handle connection state if needed
+                val (chipText, color) = when (newState) {
+                    BluetoothProfile.STATE_CONNECTED -> "已连接" to Color.rgb(0x2E, 0x7D, 0x32)
+                    BluetoothProfile.STATE_CONNECTING -> "连接中" to Color.rgb(0x61, 0x61, 0x61)
+                    BluetoothProfile.STATE_DISCONNECTED -> "未连接" to Color.rgb(0x9E, 0x9E, 0x9E)
+                    else -> "未连接" to Color.rgb(0x9E, 0x9E, 0x9E)
+                }
+                runOnUiThread {
+                    textConnectionStatus.text = chipText
+                    textConnectionStatus.setTextColor(color)
+                }
             }
         )
     }
@@ -279,69 +317,67 @@ class MainActivity : AppCompatActivity() {
         currentSoc = data.soc
         FloatingWindowService.updateData(currentSpeed, currentVoltage, currentCurrent, currentVoltageDiff, currentSoc)
 
-        val sb = StringBuilder()
-        sb.append("--- BMS Status ---\n")
-        sb.append("Total Voltage: %.2f V\n".format(data.totalVoltage))
-        sb.append("Voltage Diff:  %d mV\n".format(data.voltageDiff))
-        sb.append("Current:       %.1f A\n".format(data.current))
-        sb.append("Power:         %.1f W\n".format(data.power))
-        sb.append("SOC:           %d %%\n".format(data.soc))
-        sb.append("SOH:           %d %%\n".format(data.soh))
-        sb.append("Capacity:      %.2f Ah\n".format(data.capacity))
-        sb.append("Remaining:     %.2f Ah\n".format(data.remainingCharge))
-        sb.append("MOS Temp:      %d °C\n".format(data.mosTemp))
-        sb.append("Balancer Temp: %d °C\n".format(data.balancerTemp))
-        
-        if (data.temperatures.isNotEmpty()) {
-            sb.append("Sensor Temps:  ${data.temperatures.joinToString(", ")} °C\n")
-        }
-        
-        val d = data.runtime / 86400
-        val h = (data.runtime % 86400) / 3600
-        val m = (data.runtime % 3600) / 60
-        val s = data.runtime % 60
-        sb.append("Runtime:       %d天 %02d:%02d:%02d\n".format(d, h, m, s))
-
-        sb.append("\n--- Cell Voltages ---\n")
-
-        // 计算电压最高的 3 个和最低的 3 个电池单体下标
-        val highest3 = data.cellVoltages.indices
-            .sortedByDescending { data.cellVoltages[it] }
-            .take(3)
-            .toSet()
-        val lowest3 = data.cellVoltages.indices
-            .sortedBy { data.cellVoltages[it] }
-            .take(3)
-            .toSet()
-
-        // 记录需要着色的文本范围（以整行处理，便于一眼区分）
-        val colorSpans = mutableListOf<Pair<IntRange, Int>>()
-        data.cellVoltages.forEachIndexed { index, voltage ->
-            val start = sb.length
-            sb.append("Cell %02d: %d mV\n".format(index + 1, voltage))
-            val end = sb.length
-            val color = when {
-                index in highest3 -> Color.RED
-                index in lowest3  -> Color.GREEN
-                else -> null
-            }
-            if (color != null) {
-                colorSpans.add(start until end to color)
-            }
-        }
-
-        val spannable = SpannableString(sb.toString())
-        colorSpans.forEach { (range, color) ->
-            spannable.setSpan(
-                ForegroundColorSpan(color),
-                range.first,
-                range.last + 1,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-        }
-
         runOnUiThread {
-            bmsDataTextView.text = spannable
+            textTotalVoltage.text = "%.2f".format(data.totalVoltage)
+            textSoc.text = data.soc.toString()
+            progressSoc.progress = data.soc.coerceIn(0, 100)
+            textCurrent.text = "%.1f A".format(data.current)
+            textPower.text = "%.1f W".format(data.power)
+            textVoltageDiff.text = "%d mV".format(data.voltageDiff)
+            textSoh.text = "%d %%".format(data.soh)
+            textCapacity.text = "%.2f Ah".format(data.capacity)
+            textRemaining.text = "%.2f Ah".format(data.remainingCharge)
+
+            val d = data.runtime / 86400
+            val h = (data.runtime % 86400) / 3600
+            val m = (data.runtime % 3600) / 60
+            val s = data.runtime % 60
+            textRuntime.text = "%d天 %02d:%02d:%02d".format(d, h, m, s)
+
+            textMosTemp.text = "%d °C".format(data.mosTemp)
+            textBalancerTemp.text = "%d °C".format(data.balancerTemp)
+            textTemps.text = if (data.temperatures.isNotEmpty()) {
+                data.temperatures.joinToString(", ") { "$it °C" }
+            } else {
+                "--"
+            }
+
+            // ---- 单体电压（等宽文本 + 高低着色） ----
+            val sb = StringBuilder()
+            val highest3 = data.cellVoltages.indices
+                .sortedByDescending { data.cellVoltages[it] }
+                .take(3)
+                .toSet()
+            val lowest3 = data.cellVoltages.indices
+                .sortedBy { data.cellVoltages[it] }
+                .take(3)
+                .toSet()
+
+            val colorSpans = mutableListOf<Pair<IntRange, Int>>()
+            data.cellVoltages.forEachIndexed { index, voltage ->
+                val start = sb.length
+                sb.append("Cell %02d  %d mV\n".format(index + 1, voltage))
+                val end = sb.length
+                val color = when {
+                    index in highest3 -> Color.RED
+                    index in lowest3  -> Color.GREEN
+                    else -> null
+                }
+                if (color != null) {
+                    colorSpans.add(start until end to color)
+                }
+            }
+
+            val spannable = SpannableString(sb.toString())
+            colorSpans.forEach { (range, color) ->
+                spannable.setSpan(
+                    ForegroundColorSpan(color),
+                    range.first,
+                    range.last + 1,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            textCellVoltages.text = spannable
         }
     }
 

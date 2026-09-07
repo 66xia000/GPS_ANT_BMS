@@ -1,5 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- ============================================================
+         Material 3 颜色令牌 —— 浅色主题 (Light)
+         token 名固定，可被 values-night 覆盖实现深色模式
+         ============================================================ -->
+    <color name="primary">#006B54</color>
+    <color name="onPrimary">#FFFFFF</color>
+    <color name="primaryContainer">#7AF6CF</color>
+    <color name="onPrimaryContainer">#002117</color>
+
+    <color name="secondary">#4A635A</color>
+    <color name="onSecondary">#FFFFFF</color>
+    <color name="secondaryContainer">#CCE9DC</color>
+    <color name="onSecondaryContainer">#06201A</color>
+
+    <color name="tertiary">#3E6373</color>
+    <color name="onTertiary">#FFFFFF</color>
+    <color name="tertiaryContainer">#C2E8FB</color>
+    <color name="onTertiaryContainer">#001F2B</color>
+
+    <color name="error">#BA1A1A</color>
+    <color name="onError">#FFFFFF</color>
+    <color name="errorContainer">#FFDAD6</color>
+    <color name="onErrorContainer">#410002</color>
+
+    <color name="background">#F7FAF7</color>
+    <color name="onBackground">#191C1A</color>
+
+    <color name="surface">#F7FAF7</color>
+    <color name="onSurface">#191C1A</color>
+    <color name="surfaceVariant">#DBE5DE</color>
+    <color name="onSurfaceVariant">#3F4944</color>
+
+    <color name="outline">#6F7973</color>
+    <color name="outlineVariant">#BFCAC2</color>
+
+    <!-- 状态色（电池监控专用） -->
+    <color name="status_charging">#FB8C00</color>
+    <color name="status_discharging">#2E7D32</color>
+    <color name="status_warning">#D32F2F</color>
+    <color name="status_idle">#616161</color>
+
+    <!-- 经典中性色（兼容引用） -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
 </resources>
