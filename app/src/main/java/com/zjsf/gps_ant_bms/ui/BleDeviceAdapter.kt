@@ -31,7 +31,7 @@ class BleDeviceAdapter(
         val device = devices[position]
         holder.nameTextView.text = device.name
         holder.addressTextView.text = device.address
-        holder.rssiTextView.text = "RSSI: ${device.rssi} dBm"
+        holder.rssiTextView.text = "${device.rssi} dBm"
         
         holder.itemView.setOnClickListener {
             Toast.makeText(context, "Connecting to: ${device.address}", Toast.LENGTH_SHORT).show()

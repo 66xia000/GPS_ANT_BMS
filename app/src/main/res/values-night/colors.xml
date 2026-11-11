@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material 3 颜色令牌 —— 深色主题 (Dark) -->
+    <color name="primary">#5ED9AF</color>
+    <color name="onPrimary">#00382A</color>
+    <color name="primaryContainer">#00513E</color>
+    <color name="onPrimaryContainer">#7AF6CF</color>
+
+    <color name="secondary">#B0CCBF</color>
+    <color name="onSecondary">#1C352D</color>
+    <color name="secondaryContainer">#334B42</color>
+    <color name="onSecondaryContainer">#CCE9DC</color>
+
+    <color name="tertiary">#A6CCE0</color>
+    <color name="onTertiary">#083545</color>
+    <color name="tertiaryContainer">#264C5C</color>
+    <color name="onTertiaryContainer">#C2E8FB</color>
+
+    <color name="error">#FFB4AB</color>
+    <color name="onError">#690005</color>
+    <color name="errorContainer">#93000A</color>
+    <color name="onErrorContainer">#FFDAD6</color>
+
+    <color name="background">#111411</color>
+    <color name="onBackground">#E1E3DE</color>
+
+    <color name="surface">#111411</color>
+    <color name="onSurface">#E1E3DE</color>
+    <color name="surfaceVariant">#3F4944</color>
+    <color name="onSurfaceVariant">#BFCAC2</color>
+
+    <color name="outline">#89938D</color>
+    <color name="outlineVariant">#3F4944</color>
+
+    <!-- 状态色（深色下稍微提亮） -->
+    <color name="status_charging">#FFB74D</color>
+    <color name="status_discharging">#81C784</color>
+    <color name="status_warning">#EF5350</color>
+    <color name="status_idle">#9E9E9E</color>
+</resources>
